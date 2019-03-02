@@ -15,7 +15,7 @@ argMapping = {1:"random", 2:"moms", 3:"jerow", 4:"logreg"}
 
 print("Finding satisfying interpretation of", args.infile, "using", argMapping[args.heuristic], "splits...")
 pm.execute_notebook(
-   'SAT_RJ.ipynb',
+   'SAT_book.ipynb',
    'output.ipynb',
    parameters = dict(heuristic=argMapping[args.heuristic], infile=args.infile)
 )
@@ -25,7 +25,7 @@ df = nb.dataframe
 solution = next(iter((df[df['name']=='solution']['value'].values)))
 
 if solution:
-    print("Saved solution to file")   
+    print("Saved solution to file: solution.txt")   
 else:
     print("No solution found")
 

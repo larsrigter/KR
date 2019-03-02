@@ -18,6 +18,7 @@ The following required Python packages are probably installed already.
 - copy
 - collections
 - argparse
+- pandas
 
 After installing **papermill** and in possession of the required packages, the command runs the SAT solver with required arguments:
 ```sh

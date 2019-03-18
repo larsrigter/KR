@@ -4,21 +4,22 @@ quantity('outflow').
 quantity('volume').
 
 %% Possible derivaties
-derivative('-').
-derivative(0).
-derivative('+').
+derivative_space('-').
+derivative_space(0).
+derivative_space('+').
+derivative_space('?').
 
 %% Possible quantity spaces
-space('inflow', 0).
-space('inflow', '+').
+quantity_space('inflow', 0).
+quantity_space('inflow', '+').
 
-space('outflow', 0).
-space('outflow', '+').
-space('outflow','max').
+quantity_space('outflow', 0).
+quantity_space('outflow', '+').
+quantity_space('outflow','max').
 
-space('volume', 0).
-space('volume', '+').
-space('volume', 'max').
+quantity_space('volume', 0).
+quantity_space('volume', '+').
+quantity_space('volume', 'max').
 
 %% Explanations
 explain('?', 'This value is ambiguous').
@@ -28,7 +29,7 @@ explain('+', 'This value is increasing').
 explain('max', 'This value is at its maximum').
 
 
-transition('+')
+transition('+').
 
 %% Dependencies
 i1('inflow', 'volume').
@@ -46,31 +47,54 @@ is_negatively_influencing(X, Y):-
     i0(X, Y).
 
 is_positively_proportional_to(X, Y):-
-    p1(X, Y);
-    p1(Y, X).
+    p1(X, Y).
 
 % Not used in our problem
 is_negatively_proportional_to(X, Y):- 
-    p0(X, Y);
-    p0(Y, X).
+    p0(X, Y).
 
-has_value_correspondence(X, Y, Value):-
-    vc(X, Y, Value).
+is_steady(X, Y, Magnitude):-
+    vc(X, Y, Magnitude);
+    vc(Y, X, Magnitude).
 
-is_increasing(X):-
-    is_positively_influencing(Y, X);
+increasing_derivative('+').
+increasing_derivative('unknown').
+is_increasing(Y, X, SubjectMagnitude, SubjectDerivative, ObjectDerivative):-
     is_positively_proportional_to(Y, X),
-    state(Y, '+').
-
-is_decreasing(X):-
-    is_negatively_influencing(Y, X);
+    SubjectDerivative == '+',
+    increasing_derivative(ObjectDerivative);
     is_negatively_proportional_to(Y, X),
-    state(Y, '+').
+    SubjectDerivative == '-',
+    increasing_derivative(ObjectDerivative);
+    is_positively_influencing(Y, X),
+    SubjectMagnitude == '+',
+    increasing_derivative(ObjectDerivative);
+    is_negatively_influencing(Y, X),
+    SubjectMagnitude == '-',
+    increasing_derivative(ObjectDerivative).
 
-is_decreasing(X)
-    is_positively_influencing(Y, X);
+decreasing_derivative('-').
+decreasing_derivative('unknown').
+is_decreasing(Y, X, SubjectMagnitude, SubjectDerivative, ObjectDerivative):-
     is_positively_proportional_to(Y, X),
-    state(Y, '-').
+    SubjectDerivative == '-',
+    decreasing_derivative(ObjectDerivative);
+    is_negatively_proportional_to(Y, X),
+    SubjectDerivative == '+',
+    decreasing_derivative(ObjectDerivative);
+    is_positively_influencing(Y, X),
+    SubjectMagnitude == '-',
+    decreasing_derivative(ObjectDerivative);
+    is_negatively_influencing(Y, X),
+    SubjectMagnitude == '+',
+    decreasing_derivative(ObjectDerivative).
+
+is_ambiguous(Y, X, SubjectMagnitude, SubjectDerivative, ObjectDerivative):-
+    is_increasing(Y, X, SubjectMagnitude, SubjectDerivative, ObjectDerivative),
+    ObjectDerivative == '-';
+    is_decreasing(Y, X, SubjectMagnitude, SubjectDerivative, ObjectDerivative),
+    ObjectDerivative == '+'.
+
 
 % state(Inflow, Outflow, Volume)?
 % state('+', Outflow, Volume)?
@@ -80,20 +104,86 @@ is_decreasing(X)
 % state('+', '0', '+')?
 % yes.
 
-state(InflowMagnitude, OutflowMagnitude, VolumMagnitude):-
-    space('inflow', InflowMagnitude),
-    derivative(InflowDerivative),
-    space('outflow', OutflowMagnitude),
-    derivative(OutflowDerivative),
-    space('volume', VolumeMagnitude),
-    derivative(VolumeDerivative),
-    valid_state(InflowMagnitude, InflowDerivative, OutflowMagnitude, 
-        OutflowDerivative, VolumeMagnitude, VolumeDerivative).
+
+resolution(Subject, Object, '+'):-
+    Subject = [SubjectName, SubjectMagnitude, SubjectDerivative],
+    quantity_space(SubjectName, SubjectMagnitude),
+    derivative_space(SubjectDerivative),
+    Object = [ObjectName, ObjectMagnitude, ObjectDerivative],
+    quantity_space(ObjectName, ObjectMagnitude),
+    derivative_space(ObjectDerivative),
+    is_increasing(SubjectName, ObjectName, SubjectMagnitude, SubjectDerivative, ObjectDerivative).
+
+resolution(Subject, Object, '-'):-
+    Subject = [SubjectName, SubjectMagnitude, SubjectDerivative],
+    quantity_space(SubjectName, SubjectMagnitude),
+    derivative_space(SubjectDerivative),
+    Object = [ObjectName, ObjectMagnitude, ObjectDerivative],
+    quantity_space(ObjectName, ObjectMagnitude),
+    derivative_space(ObjectDerivative),
+    is_decreasing(SubjectName, ObjectName, SubjectMagnitude, SubjectDerivative, ObjectDerivative).
+
+resolution(Subject, Object, '?'):-
+    Subject = [SubjectName, SubjectMagnitude, SubjectDerivative],
+    quantity_space(SubjectName, SubjectMagnitude),
+    derivative_space(SubjectDerivative),
+    Object = [ObjectName, ObjectMagnitude, ObjectDerivative],
+    quantity_space(ObjectName, ObjectMagnitude),
+    derivative_space(ObjectDerivative),
+    is_ambiguous(SubjectName, ObjectName, SubjectMagnitude, SubjectDerivative, ObjectDerivative).
+
+resolution(Subject, Object, 'unknown'):-
+    Subject = [SubjectName, SubjectMagnitude, SubjectDerivative],
+    quantity_space(SubjectName, SubjectMagnitude),
+    derivative_space(SubjectDerivative),
+    Object = [ObjectName, ObjectMagnitude, ObjectDerivative],
+    quantity_space(ObjectName, ObjectMagnitude),
+    derivative_space(ObjectDerivative),
+    not(is_increasing(SubjectName, ObjectName, SubjectMagnitude, SubjectDerivative, ObjectDerivative)),
+    not(is_decreasing(SubjectName, ObjectName, SubjectMagnitude, SubjectDerivative, ObjectDerivative)),
+    not(is_ambiguous(SubjectName, ObjectName, SubjectMagnitude, SubjectDerivative, ObjectDerivative)).
 
 
-valid_state(InflowMagnitude, InflowDerivative, OutflowMagnitude, 
-    OutflowDerivative, VolumeMagnitude, VolumeDerivative):-  
-    check_conflict()
+
+resolution(Quantity, [], Result).
+resolution(Quantity, Rest, Result):-
+    findall(Quantity, quantity(Quantity), AllQuantities),
+
+
+% OPTION: Keep the resolution results for each quantity to later decide on them?
+
+state(QuantityStates):-
+    states(QuantityStates, []).
+
+state([QuantityState], Result):-
+    QuantityState = [Quantity, Magnitude, Derivative],
+    quantity_space(Quantity, Magnitude),
+    derivative_space(Derivative),
+    resolution(QuantityState, ResultTail),
+
+state(QuantityStates, Result):-
+    QuantitiyStates = [H|T],
+    H = [Quantity, Magnitude, Derivative],
+    quantity_space(Quantity, Magnitude),
+    derivative_space(Derivative),
+    resolution(H, ResultTail),
+    state(T).
+
+
+% state(InflowMagnitude, OutflowMagnitude, VolumMagnitude):-
+%     quantity_space('inflow', InflowMagnitude),
+%     derivative(InflowDerivative),
+%     quantity_space('outflow', OutflowMagnitude),
+%     derivative(OutflowDerivative),
+%     quantity_space('volume', VolumeMagnitude),
+%     derivative(VolumeDerivative),
+%     valid_state(InflowMagnitude, InflowDerivative, OutflowMagnitude, 
+%         OutflowDerivative, VolumeMagnitude, VolumeDerivative).
+
+
+% valid_state(InflowMagnitude, InflowDerivative, OutflowMagnitude, 
+%     OutflowDerivative, VolumeMagnitude, VolumeDerivative):-  
+%     check_conflict()
 
 
 

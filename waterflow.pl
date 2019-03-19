@@ -35,6 +35,7 @@ transition('+').
 i1('inflow', 'volume').
 i0('outflow', 'volume').
 p1('volume', 'outflow').
+p0('something', 'somethingelse').
 vc('volume', 'outflow', 'max').
 vc('volume', 'outflow', 0).
 
@@ -58,6 +59,7 @@ is_steady(X, Y, Magnitude):-
     vc(Y, X, Magnitude).
 
 increasing_derivative('+').
+increasing_derivative(0).
 increasing_derivative('unknown').
 is_increasing(Y, X, SubjectMagnitude, SubjectDerivative, ObjectDerivative):-
     is_positively_proportional_to(Y, X),
@@ -74,6 +76,7 @@ is_increasing(Y, X, SubjectMagnitude, SubjectDerivative, ObjectDerivative):-
     increasing_derivative(ObjectDerivative).
 
 decreasing_derivative('-').
+decreasing_derivative(0).
 decreasing_derivative('unknown').
 is_decreasing(Y, X, SubjectMagnitude, SubjectDerivative, ObjectDerivative):-
     is_positively_proportional_to(Y, X),
@@ -105,7 +108,7 @@ is_ambiguous(Y, X, SubjectMagnitude, SubjectDerivative, ObjectDerivative):-
 % yes.
 
 
-resolution(Subject, Object, '+'):-
+calculus(Subject, Object, '+'):-
     Subject = [SubjectName, SubjectMagnitude, SubjectDerivative],
     quantity_space(SubjectName, SubjectMagnitude),
     derivative_space(SubjectDerivative),
@@ -114,7 +117,7 @@ resolution(Subject, Object, '+'):-
     derivative_space(ObjectDerivative),
     is_increasing(SubjectName, ObjectName, SubjectMagnitude, SubjectDerivative, ObjectDerivative).
 
-resolution(Subject, Object, '-'):-
+calculus(Subject, Object, '-'):-
     Subject = [SubjectName, SubjectMagnitude, SubjectDerivative],
     quantity_space(SubjectName, SubjectMagnitude),
     derivative_space(SubjectDerivative),
@@ -123,7 +126,7 @@ resolution(Subject, Object, '-'):-
     derivative_space(ObjectDerivative),
     is_decreasing(SubjectName, ObjectName, SubjectMagnitude, SubjectDerivative, ObjectDerivative).
 
-resolution(Subject, Object, '?'):-
+calculus(Subject, Object, '?'):-
     Subject = [SubjectName, SubjectMagnitude, SubjectDerivative],
     quantity_space(SubjectName, SubjectMagnitude),
     derivative_space(SubjectDerivative),
@@ -132,7 +135,7 @@ resolution(Subject, Object, '?'):-
     derivative_space(ObjectDerivative),
     is_ambiguous(SubjectName, ObjectName, SubjectMagnitude, SubjectDerivative, ObjectDerivative).
 
-resolution(Subject, Object, 'unknown'):-
+calculus(Subject, Object, 'unknown'):-
     Subject = [SubjectName, SubjectMagnitude, SubjectDerivative],
     quantity_space(SubjectName, SubjectMagnitude),
     derivative_space(SubjectDerivative),
@@ -144,46 +147,28 @@ resolution(Subject, Object, 'unknown'):-
     not(is_ambiguous(SubjectName, ObjectName, SubjectMagnitude, SubjectDerivative, ObjectDerivative)).
 
 
+resolution(_, [], []).
+resolution(Subject, [Object|Rest], [ResolvedObject|ResolvedObjects]):-
+    ResolvedObject = [_, _, ObjectDerivative],
+    calculus(Subject, Object, ObjectDerivative),
+    resolution(Subject, Rest, ResolvedObjects).
 
-resolution(Quantity, [], Result).
-resolution(Quantity, Rest, Result):-
-    findall(Quantity, quantity(Quantity), AllQuantities),
+state(QuantityStates, ResultStates):-
+    state(QuantityStates, QuantityStates, ResultStates).
 
-
-% OPTION: Keep the resolution results for each quantity to later decide on them?
-
-state(QuantityStates):-
-    states(QuantityStates, []).
-
-state([QuantityState], Result):-
+state([QuantityState], States, ResultStates):-
     QuantityState = [Quantity, Magnitude, Derivative],
     quantity_space(Quantity, Magnitude),
     derivative_space(Derivative),
-    resolution(QuantityState, ResultTail),
+    resolution(QuantityState, States, ResultStates).
 
-state(QuantityStates, Result):-
-    QuantitiyStates = [H|T],
-    H = [Quantity, Magnitude, Derivative],
+state(QuantityStates, States, ResultStates):-
+    QuantityStates = [S|T],
+    S = [Quantity, Magnitude, Derivative],
     quantity_space(Quantity, Magnitude),
     derivative_space(Derivative),
-    resolution(H, ResultTail),
-    state(T).
-
-
-% state(InflowMagnitude, OutflowMagnitude, VolumMagnitude):-
-%     quantity_space('inflow', InflowMagnitude),
-%     derivative(InflowDerivative),
-%     quantity_space('outflow', OutflowMagnitude),
-%     derivative(OutflowDerivative),
-%     quantity_space('volume', VolumeMagnitude),
-%     derivative(VolumeDerivative),
-%     valid_state(InflowMagnitude, InflowDerivative, OutflowMagnitude, 
-%         OutflowDerivative, VolumeMagnitude, VolumeDerivative).
-
-
-% valid_state(InflowMagnitude, InflowDerivative, OutflowMagnitude, 
-%     OutflowDerivative, VolumeMagnitude, VolumeDerivative):-  
-%     check_conflict()
+    resolution(S, States, NextStates),
+    state(T, NextStates, ResultStates).
 
 
 

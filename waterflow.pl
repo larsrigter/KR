@@ -54,9 +54,20 @@ is_positively_proportional_to(X, Y):-
 is_negatively_proportional_to(X, Y):- 
     p0(X, Y).
 
-is_steady(X, Y, Magnitude):-
-    vc(X, Y, Magnitude);
-    vc(Y, X, Magnitude).
+has_value_correspondence(X, Y):-
+    vc(X, Y, Value),
+    vc(X, Y, Value).
+
+consistent_magnitude(Object, Subject):-
+    Subject = [SubjectName, SubjectMagnitude, _],
+    Object = [ObjectName, ObjectMagnitude, _],
+    has_value_correspondence(SubjectName, ObjectName),
+    ObjectMagnitude == SubjectMagnitude.
+
+consistent_magnitude(Object, Subject):-
+    Subject = [SubjectName, _, _],
+    Object = [ObjectName, _, _],
+    not(has_value_correspondence(SubjectName, ObjectName)).
 
 increasing_derivative('+').
 increasing_derivative(0).
@@ -98,17 +109,7 @@ is_ambiguous(Y, X, SubjectMagnitude, SubjectDerivative, ObjectDerivative):-
     is_decreasing(Y, X, SubjectMagnitude, SubjectDerivative, ObjectDerivative),
     ObjectDerivative == '+'.
 
-
-% state(Inflow, Outflow, Volume)?
-% state('+', Outflow, Volume)?
-% -> possible states.
-% state('+', '0', '0')?
-% no.
-% state('+', '0', '+')?
-% yes.
-
-
-calculus(Subject, Object, '+'):-
+derivative_calculus(Subject, Object, '+'):-
     Subject = [SubjectName, SubjectMagnitude, SubjectDerivative],
     quantity_space(SubjectName, SubjectMagnitude),
     derivative_space(SubjectDerivative),
@@ -117,7 +118,7 @@ calculus(Subject, Object, '+'):-
     derivative_space(ObjectDerivative),
     is_increasing(SubjectName, ObjectName, SubjectMagnitude, SubjectDerivative, ObjectDerivative).
 
-calculus(Subject, Object, '-'):-
+derivative_calculus(Subject, Object, '-'):-
     Subject = [SubjectName, SubjectMagnitude, SubjectDerivative],
     quantity_space(SubjectName, SubjectMagnitude),
     derivative_space(SubjectDerivative),
@@ -126,7 +127,7 @@ calculus(Subject, Object, '-'):-
     derivative_space(ObjectDerivative),
     is_decreasing(SubjectName, ObjectName, SubjectMagnitude, SubjectDerivative, ObjectDerivative).
 
-calculus(Subject, Object, '?'):-
+derivative_calculus(Subject, Object, '?'):-
     Subject = [SubjectName, SubjectMagnitude, SubjectDerivative],
     quantity_space(SubjectName, SubjectMagnitude),
     derivative_space(SubjectDerivative),
@@ -135,7 +136,7 @@ calculus(Subject, Object, '?'):-
     derivative_space(ObjectDerivative),
     is_ambiguous(SubjectName, ObjectName, SubjectMagnitude, SubjectDerivative, ObjectDerivative).
 
-calculus(Subject, Object, 'unknown'):-
+derivative_calculus(Subject, Object, 'unknown'):-
     Subject = [SubjectName, SubjectMagnitude, SubjectDerivative],
     quantity_space(SubjectName, SubjectMagnitude),
     derivative_space(SubjectDerivative),
@@ -150,8 +151,26 @@ calculus(Subject, Object, 'unknown'):-
 resolution(_, [], []).
 resolution(Subject, [Object|Rest], [ResolvedObject|ResolvedObjects]):-
     ResolvedObject = [_, _, ObjectDerivative],
-    calculus(Subject, Object, ObjectDerivative),
+    derivative_calculus(Subject, Object, ObjectDerivative),
+    consistent_magnitude(Subject, Object),
     resolution(Subject, Rest, ResolvedObjects).
+
+
+% state([['inflow', 0, '+'], ['outflow', M1, D1], ['volume', M2, D2]])
+
+% state([]).
+% state(State):-
+%     State = [Quantity, Magnitude, Derivative],
+%     quantity_space(Quantity, Magnitude),
+%     derivative_space(Derivative).
+
+% state(States):-
+%     States = [S|T],
+%     S = [Quantity, Magnitude, Derivative],
+%     quantity_space(Quantity, Magnitude),
+%     derivative_space(Derivative),
+%     state(T).
+
 
 state(QuantityStates, ResultStates):-
     state(QuantityStates, QuantityStates, ResultStates).

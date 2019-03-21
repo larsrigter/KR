@@ -1,7 +1,7 @@
 % Quantities
-quantity('inflow').
-quantity('outflow').
-quantity('volume').
+quantity(inflow).
+quantity(outflow).
+quantity(volume).
 
 % Possible derivaties
 derivative_space('-').
@@ -9,7 +9,7 @@ derivative_space(0).
 derivative_space('+').
 derivative_space('?').
 
-decreasing_derivative_previous(-).
+decreasing_derivative_previous('-').
 decreasing_derivative_previous(0).
 
 increasing_derivative_previous('+').
@@ -40,7 +40,7 @@ transition(0, '+').
 transition('+', max).
 
 is_transition(X, Y):-
-    transition(X, Y), !;
+    transition(X, Y);
     transition(Y, X).
 
 % Dependencies
@@ -66,7 +66,7 @@ is_negatively_proportional_to(X, Y):-
     p0(X, Y).
 
 has_value_correspondence(X, Y):-
-    vc(X, Y, _), !;
+    vc(X, Y, _);
     vc(Y, X, _).
 
 consistent_magnitude(Object, Subject):-
@@ -80,39 +80,23 @@ consistent_magnitude(Object, Subject):-
     Object = [ObjectName, _, _],
     not(has_value_correspondence(SubjectName, ObjectName)).
 
-is_increasing(Subject, Object):-
-    Subject = [SubjectName, _, SubjectDerivative],
-    Object = [ObjectName, _, _],
+is_increasing([SubjectName, SubjectMagnitude, SubjectDerivative], [ObjectName, _, _]):-
     is_positively_proportional_to(SubjectName, ObjectName),
     SubjectDerivative == '+';
-    Subject = [SubjectName, _, SubjectDerivative],
-    Object = [ObjectName, _, _],
     is_negatively_proportional_to(SubjectName, ObjectName),
     SubjectDerivative == '-';
-    Subject = [SubjectName, SubjectMagnitude, _],
-    Object = [ObjectName, _, _],
     is_positively_influencing(SubjectName, ObjectName),
     SubjectMagnitude == '+';
-    Subject = [SubjectName, SubjectMagnitude, _],
-    Object = [ObjectName, _, _],
     is_negatively_influencing(SubjectName, ObjectName),
     SubjectMagnitude == '-'.
 
-is_decreasing(Subject, Object):-
-    Subject = [SubjectName, _, SubjectDerivative],
-    Object = [ObjectName, _, _],
+is_decreasing([SubjectName, SubjectMagnitude, SubjectDerivative], [ObjectName, _, _]):-
     is_positively_proportional_to(SubjectName, ObjectName),
     SubjectDerivative == '-';
-    Subject = [SubjectName, _, SubjectDerivative],
-    Object = [ObjectName, _, _],
     is_negatively_proportional_to(SubjectName, ObjectName),
     SubjectDerivative == '+';
-    Subject = [SubjectName, SubjectMagnitude, _],
-    Object = [ObjectName, _, _],
     is_positively_influencing(SubjectName, ObjectName),
     SubjectMagnitude == '-';
-    Subject = [SubjectName, SubjectMagnitude, _],
-    Object = [ObjectName, _, _],
     is_negatively_influencing(SubjectName, ObjectName),
     SubjectMagnitude == '+'.
 
@@ -129,56 +113,46 @@ is_ambiguous(Subject, Object):-
     ObjectDerivative == '?'.
 
 is_steady(Subject, Object):-
+    Subject = [SubjectName, SubjectMagnitude, SubjectDerivative],
+    quantity_space(SubjectName, SubjectMagnitude),
+    derivative_space(SubjectDerivative),
+    Object = [ObjectName, ObjectMagnitude, ObjectDerivative],
+    quantity_space(ObjectName, ObjectMagnitude),
+    derivative_space(ObjectDerivative),
     not(is_decreasing(Subject, Object)),
     not(is_increasing(Subject, Object)),
     not(is_ambiguous(Subject, Object)).
 
-derivative_calculus(Subject, Object, '+'):-
-    Subject = [SubjectName, SubjectMagnitude, SubjectDerivative],
-    quantity_space(SubjectName, SubjectMagnitude),
-    derivative_space(SubjectDerivative),
+
+
+derivative_calculus(Subject, Object, [ObjectName, ObjectMagnitude, '+']):-
     Object = [ObjectName, ObjectMagnitude, ObjectDerivative],
-    quantity_space(ObjectName, ObjectMagnitude),
-    derivative_space(ObjectDerivative),
     increasing_derivative_previous(ObjectDerivative),
     is_increasing(Subject, Object).
 
-derivative_calculus(Subject, Object, '-'):-
-    Subject = [SubjectName, SubjectMagnitude, SubjectDerivative],
-    quantity_space(SubjectName, SubjectMagnitude),
-    derivative_space(SubjectDerivative),
+derivative_calculus(Subject, Object, [ObjectName, ObjectMagnitude, '-']):-
     Object = [ObjectName, ObjectMagnitude, ObjectDerivative],
-    quantity_space(ObjectName, ObjectMagnitude),
-    derivative_space(ObjectDerivative),
     decreasing_derivative_previous(ObjectDerivative),
     is_decreasing(Subject, Object).
 
-derivative_calculus(Subject, Object, '?'):-
-    Subject = [SubjectName, SubjectMagnitude, SubjectDerivative],
-    quantity_space(SubjectName, SubjectMagnitude),
-    derivative_space(SubjectDerivative),
-    Object = [ObjectName, ObjectMagnitude, ObjectDerivative],
-    quantity_space(ObjectName, ObjectMagnitude),
-    derivative_space(ObjectDerivative),
+derivative_calculus(Subject, Object, [ObjectName, ObjectMagnitude, '?']):-
+    Object = [ObjectName, ObjectMagnitude, _],
     is_ambiguous(Subject, Object).
 
-derivative_calculus(Subject, Object, ObjectDerivative):-
-    Subject = [SubjectName, SubjectMagnitude, SubjectDerivative],
-    quantity_space(SubjectName, SubjectMagnitude),
-    derivative_space(SubjectDerivative),
+derivative_calculus(Subject, Object, [ObjectName, ObjectMagnitude, ObjectDerivative]):-
     Object = [ObjectName, ObjectMagnitude, ObjectDerivative],
-    quantity_space(ObjectName, ObjectMagnitude),
-    derivative_space(ObjectDerivative),
+    consistent_magnitude(Subject, Object),
     is_steady(Subject, Object).
 
 
 
-resolution(_, [], []).
-resolution(_, [], _). %necessary'?'
-resolution(Subject, [Object|Rest], [ResolvedObject|ResolvedObjects]):-
-    ResolvedObject = [_, _, ObjectDerivative],
-    derivative_calculus(Subject, Object, ObjectDerivative),
+resolution(Subject, [Object], [ResolvedObject]):-
     consistent_magnitude(Subject, Object),
+    derivative_calculus(Subject, Object, ResolvedObject), !.
+
+resolution(Subject, [Object|Rest], [ResolvedObject|ResolvedObjects]):-
+    consistent_magnitude(Subject, Object),
+    derivative_calculus(Subject, Object, ResolvedObject),
     resolution(Subject, Rest, ResolvedObjects).
 
 

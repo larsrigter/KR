@@ -144,16 +144,26 @@ derivative_calculus(Subject, Object, [ObjectName, ObjectMagnitude, ObjectDerivat
     consistent_magnitude(Subject, Object),
     is_steady(Subject, Object).
 
-
-
-resolution(Subject, [Object], [ResolvedObject]):-
+resolution_single(Subject, [Object], [ResolvedObject]):-
     consistent_magnitude(Subject, Object),
     derivative_calculus(Subject, Object, ResolvedObject), !.
 
-resolution(Subject, [Object|Rest], [ResolvedObject|ResolvedObjects]):-
+resolution_single(Subject, [Object|Rest], [ResolvedObject|ResolvedObjects]):-
     consistent_magnitude(Subject, Object),
     derivative_calculus(Subject, Object, ResolvedObject),
-    resolution(Subject, Rest, ResolvedObjects).
+    resolution_single(Subject, Rest, ResolvedObjects).
+
+resolution([SubjectState], ObjectStates, ResultStates):-
+    resolution_single(SubjectState, ObjectStates, ResultStates), !.
+
+resolution(SubjectStates, ObjectStates, ResultStates):-
+    SubjectStates = [S|T],
+    % S = [SubjectName, SubjectMagnitude, SubjectDerivative],
+    % quantity_space(SubjectName, SubjectMagnitude),
+    % derivative_space(SubjectDerivative),
+    resolution_single(S, ObjectStates, NextStates),
+    resolution(T, NextStates, ResultStates).
+
 
 
 % state([['inflow', 0, ''+''], ['outflow', M1, D1], ['volume', M2, D2]])
@@ -172,22 +182,33 @@ resolution(Subject, [Object|Rest], [ResolvedObject|ResolvedObjects]):-
 %     state(T).
 
 
-state(QuantityStates, ResultStates):-
-    state(QuantityStates, QuantityStates, ResultStates).
+pick_states([[InitialName, _, _]], ObjectState):-
+    ObjectState = [InitialName, PrevMagnitude, PrevDerivative],
+    quantity_space(InitialName, PrevMagnitude),
+    derivative_space(PrevDerivative).
 
-state([QuantityState], States, ResultStates):-
-    QuantityState = [Quantity, Magnitude, Derivative],
-    quantity_space(Quantity, Magnitude),
-    derivative_space(Derivative),
-    resolution(QuantityState, States, ResultStates).
+pick_states([H|T], [ObjectState|ObjectStates]):-
+    H = [InitialName, _, _],
+    ObjectState = [InitialName, PrevMagnitude, PrevDerivative],
+    quantity_space(InitialName, PrevMagnitude),
+    derivative_space(PrevDerivative),
+    pick_states(T, ObjectStates).
 
-state(QuantityStates, States, ResultStates):-
-    QuantityStates = [S|T],
-    S = [Quantity, Magnitude, Derivative],
-    quantity_space(Quantity, Magnitude),
-    derivative_space(Derivative),
-    resolution(S, States, NextStates),
-    state(T, NextStates, ResultStates).
+state(States):-
+    % pick_states(States, PickedObjectStates),
+    pick_states(States, PickedStates),
+    resolution(PickedStates, PickedStates, States).
+
+% state([SubjectState], ObjectStates, ResultStates):-
+%     resolution(SubjectState, ObjectStates, ResultStates).
+
+% state(SubjectStates, ObjectStates, ResultStates):-
+%     SubjectStates = [S|T],
+%     % S = [SubjectName, SubjectMagnitude, SubjectDerivative],
+%     % quantity_space(SubjectName, SubjectMagnitude),
+%     % derivative_space(SubjectDerivative),
+%     resolution(S, ObjectStates, NextStates),
+%     state(T, NextStates, ResultStates).
 
 
 

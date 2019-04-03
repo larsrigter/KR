@@ -28,6 +28,7 @@ highest_magnitude(outflow, max).
 highest_magnitude(volume, max).
 
 % Explanations
+explain(quantity, magnitude, explanation).
 explain('?', 'This value is ambiguous').
 explain('-', 'This value is decreasing').
 explain(0, 'This value is constant').
@@ -66,16 +67,24 @@ has_value_correspondence(X, Y):-
     vc(X, Y, _);
     vc(Y, X, _).
 
-is_magnitude_transition(X, X, _):-
-    transition(X, X).
+is_magnitude_transition(Name, X, X, _):-
+    transition(X, X),
+    asserta(explain(Name, magnitude, "The magnitude value of this quantity changed but remained on the same interval.")),
+    nl.
 
-is_magnitude_transition(X, X, 0).
+is_magnitude_transition(Name, X, X, 0):-
+    asserta(explain(Name, magnitude, "The magnitude value of this quantity remained the same.")),
+    nl.
 
-is_magnitude_transition(X, Y, Derivative):-
+is_magnitude_transition(Name, X, Y, Derivative):-
     transition(X, Y),
-    Derivative == '+';
+    Derivative == '+',
+    asserta(explain(Name, magnitude, "The magnitude of this quantity transitioned to a higher milestone/interval.")),
+    nl;
     transition(Y, X),
-    Derivative == '-'.
+    Derivative == '-',
+    asserta(explain(Name, magnitude, "The magnitude of this quantity transitioned to a lower milestone/interval.")),
+    nl.
 
 is_derivative_transition(Name, _, _, _):-
     not(exogenous(Name)), !.
@@ -148,43 +157,60 @@ is_steady(Subject, Object):-
     not(is_increasing(Subject, Object)),
     not(is_ambiguous(Subject, Object)).
 
-inequality_resolution([_, _, _], [ObjectName, ObjectMagnitude, ObjectDerivative], '-'):-
+inequality_resolution([Quantity, _, _], [ObjectName, ObjectMagnitude, ObjectDerivative], '-'):-
     ObjectDerivative == '+',
-    not(inconsistent_derivative([ObjectName, ObjectMagnitude, '-'])).
-    % write("We assume the following quantity is more influential: "),
-    % write(Quantity).
+    not(inconsistent_derivative([ObjectName, ObjectMagnitude, '-'])),
+    write("By inequality reasoning we try to resolve the ambiguous state..."),
+    nl,
+    write("We assume the following quantity is more influential: "),
+    write(Quantity),
+    nl.
 
-inequality_resolution([_, _, _], [ObjectName, ObjectMagnitude, ObjectDerivative], '-'):-
+inequality_resolution([Quantity, _, _], [ObjectName, ObjectMagnitude, ObjectDerivative], '-'):-
     ObjectDerivative == '-',
-    not(inconsistent_derivative([ObjectName, ObjectMagnitude, '-'])).
-    % write("We assume the following quantity is less influential: "),
-    % write(Quantity).
+    not(inconsistent_derivative([ObjectName, ObjectMagnitude, '-'])),
+    write("By inequality reasoning we try to resolve the ambiguous state..."),
+    nl,
+    write("We assume the following quantity is less influential: "),
+    write(Quantity),
+    nl.
 
-inequality_resolution(_, _, 0).
-    % write("We assume this quantity is just as influental as the other and they cancel each other out.").
+inequality_resolution(_, _, 0):-
+    write("We assume both quantities are equally influential and they cancel each other out."),
+    nl.
 
-inequality_resolution([_, _, _], [ObjectName, ObjectMagnitude, ObjectDerivative], '+'):-
+inequality_resolution([Quantity, _, _], [ObjectName, ObjectMagnitude, ObjectDerivative], '+'):-
     ObjectDerivative == '+',
-    not(inconsistent_derivative([ObjectName, ObjectMagnitude, '+'])).
-    % write("We assume the following quantity is less influential: "),
-    % write(Quantity).
+    not(inconsistent_derivative([ObjectName, ObjectMagnitude, '+'])),
+    write("By inequality reasoning we try to resolve the ambiguous state..."),
+    nl,
+    write("We assume the following quantity is less influential: "),
+    write(Quantity),
+    nl.
 
-inequality_resolution([_, _, _], [ObjectName, ObjectMagnitude, ObjectDerivative], '+'):-
+inequality_resolution([Quantity, _, _], [ObjectName, ObjectMagnitude, ObjectDerivative], '+'):-
     ObjectDerivative == '-',
-    not(inconsistent_derivative([ObjectName, ObjectMagnitude, '+'])).
-    % write("We assume the following quantity is more influential: "),
-    % write(Quantity).
+    not(inconsistent_derivative([ObjectName, ObjectMagnitude, '+'])),
+    write("By inequality reasoning we try to resolve the ambiguous state..."),
+    nl,
+    write("We assume the following quantity is more influential: "),
+    write(Quantity),
+    nl.
 
 derivative_calculus(Subject, Object, [ObjectName, ObjectMagnitude, '+']):-
+    Subject = [SubjectName, _, _],
     Object = [ObjectName, ObjectMagnitude, ObjectDerivative],
-    increasing_derivative_previous(ObjectDerivative),
-    is_increasing(Subject, Object).
+    is_increasing(Subject, Object),
+    write(SubjectName), write(" is increasing "), write(ObjectName), nl,
+    increasing_derivative_previous(ObjectDerivative).
 
 derivative_calculus(Subject, Object, [ObjectName, ObjectMagnitude, '-']):-
+    Subject = [SubjectName, _, _],
     Object = [ObjectName, ObjectMagnitude, ObjectDerivative],
-    decreasing_derivative_previous(ObjectDerivative),
-    is_decreasing(Subject, Object).
-
+    is_decreasing(Subject, Object),
+    write(SubjectName), write(" is decreasing "), write(ObjectName), nl,
+    decreasing_derivative_previous(ObjectDerivative).
+    
 derivative_calculus(Subject, Object, [ObjectName, ObjectMagnitude, Inequality]):-
     Object = [ObjectName, ObjectMagnitude, _],
     is_ambiguous(Subject, Object), !,
@@ -240,14 +266,16 @@ next_states(State, NextStates):-
 % Pick a next transition state subject to the transition rules
 next_state(State, NextState):-
     transition_state(State, TransitionState),
+    findall(Quantity, quantity(Quantity), Quantities),
+    explain_transition(Quantities),
     resolution(TransitionState, TransitionState, NextState).
 
 % Check for each quantity if its next values are legit
 valid_transition([], []):- !.
-valid_transition([Quantity|Quantities], [NextQuantity|NextQuantities]):-
+valid_transition([Quantity|Quantities], [NextQuantity|NextQuantities], [NextExplanation|NextExplanations]):-
     Quantity = [Name, Magnitude, Derivative],
     NextQuantity = [_, NextMagnitude, NextDerivative],
-    is_magnitude_transition(Magnitude, NextMagnitude, Derivative), !,
+    is_magnitude_transition(Name, Magnitude, NextMagnitude, Derivative), !,
     is_derivative_transition(Name, NextMagnitude, Derivative, NextDerivative), !,
     valid_transition(Quantities, NextQuantities).
 
@@ -257,6 +285,14 @@ print([H|T]):-
     write(H),
     nl,
     print(T).
+
+explain_transition([]).
+explain_transition([H|T]):-
+    explain(H, magnitude, MagnitudeExplanation), !,
+    explain(H, derivative, DerivativeExplanation), !,
+    write(MagnitudeExplanation), nl,
+    write(DerivativeExplanation), nl,
+    explain_transition(T).
 
 % Split a list into two sublist given the length of the first list
 split(L, 0, [], L).

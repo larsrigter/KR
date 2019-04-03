@@ -67,35 +67,35 @@ has_value_correspondence(X, Y):-
     vc(X, Y, _);
     vc(Y, X, _).
 
-is_magnitude_transition(Name, X, X, _):-
+is_magnitude_transition(Name, X, X, _, MagnitudeExplanation):-
     transition(X, X),
-    asserta(explain(Name, magnitude, "The magnitude value of this quantity changed but remained on the same interval.")),
+    MagnitudeExplanation = "The magnitude of the " + Name + " changed but remained on the same interval.",
     nl.
 
-is_magnitude_transition(Name, X, X, 0):-
-    asserta(explain(Name, magnitude, "The magnitude value of this quantity remained the same.")),
+is_magnitude_transition(Name, X, X, 0, MagnitudeExplanation):-
+    MagnitudeExplanation = "The magnitude value of this quantity remained the same.",
     nl.
 
-is_magnitude_transition(Name, X, Y, Derivative):-
+is_magnitude_transition(Name, X, Y, Derivative, MagnitudeExplanation):-
     transition(X, Y),
     Derivative == '+',
-    asserta(explain(Name, magnitude, "The magnitude of this quantity transitioned to a higher milestone/interval.")),
+    MagnitudeExplanation = "The magnitude of this quantity transitioned to a higher milestone/interval.",
     nl;
     transition(Y, X),
     Derivative == '-',
-    asserta(explain(Name, magnitude, "The magnitude of this quantity transitioned to a lower milestone/interval.")),
+    MagnitudeExplanation = "The magnitude of this quantity transitioned to a lower milestone/interval.",
     nl.
 
-is_derivative_transition(Name, _, _, _):-
+is_derivative_transition(Name, _, _, _, ""):-
     not(exogenous(Name)), !.
 
-is_derivative_transition(_, _, X, X):- !.
+is_derivative_transition(_, _, X, X, "same derivative"):- !.
 
-is_derivative_transition(Name, NextMagnitude, _, 0):-
+is_derivative_transition(Name, NextMagnitude, _, 0, "Derivative cannot extend past extremum."):-
     highest_magnitude(Name, NextMagnitude), !;
     lowest_magnitude(Name, NextMagnitude).
 
-is_derivative_transition(Name, _, X, Y):-
+is_derivative_transition(Name, _, X, Y, "inflow transition"):-
     exogenous(Name),
     transition(X, Y), !;
     exogenous(Name),
@@ -255,29 +255,30 @@ pick_name_state([[Name, _, _]|Quantities], [[Name, _, _]|NextQuantities]):-
     pick_name_state(Quantities, NextQuantities).
 
 % Pick a state which complies to the transition rules
-transition_state(State, TransitionState):-
+transition_state(State, TransitionState, Trace):-
     pick_name_state(State, PreservedNames),
     pick_state(PreservedNames, TransitionState),
-    valid_transition(State, TransitionState).
+    valid_transition(State, TransitionState, Trace).
 
 next_states(State, NextStates):-
     setof(NextState, next_state(State, NextState), NextStates).
 
 % Pick a next transition state subject to the transition rules
 next_state(State, NextState):-
-    transition_state(State, TransitionState),
-    findall(Quantity, quantity(Quantity), Quantities),
-    explain_transition(Quantities),
+    transition_state(State, TransitionState, Trace),
+    explain_transition(Trace),
+    % findall(Quantity, quantity(Quantity), Quantities),
     resolution(TransitionState, TransitionState, NextState).
 
 % Check for each quantity if its next values are legit
-valid_transition([], []):- !.
+valid_transition([], [], []):- !.
 valid_transition([Quantity|Quantities], [NextQuantity|NextQuantities], [NextExplanation|NextExplanations]):-
     Quantity = [Name, Magnitude, Derivative],
     NextQuantity = [_, NextMagnitude, NextDerivative],
-    is_magnitude_transition(Name, Magnitude, NextMagnitude, Derivative), !,
-    is_derivative_transition(Name, NextMagnitude, Derivative, NextDerivative), !,
-    valid_transition(Quantities, NextQuantities).
+    is_magnitude_transition(Name, Magnitude, NextMagnitude, Derivative, MagnitudeExplanation), !,
+    is_derivative_transition(Name, NextMagnitude, Derivative, NextDerivative, DerivativeExplanation), !,
+    NextExplanation = [MagnitudeExplanation, DerivativeExplanation],
+    valid_transition(Quantities, NextQuantities, NextExplanations).
 
 % Print function: print a nested list in a readable manner
 print([]).
@@ -288,9 +289,10 @@ print([H|T]):-
 
 explain_transition([]).
 explain_transition([H|T]):-
-    explain(H, magnitude, MagnitudeExplanation), !,
-    explain(H, derivative, DerivativeExplanation), !,
-    write(MagnitudeExplanation), nl,
+    H = [MagnitudeExplanation, DerivativeExplanation],
+    string(MagnitudeExplanation),
+    string(DerivativeExplanation),
+    write(MagnitudeExplanation), write(" "),
     write(DerivativeExplanation), nl,
     explain_transition(T).
 

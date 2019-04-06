@@ -69,37 +69,40 @@ has_value_correspondence(X, Y):-
 
 is_magnitude_transition(Name, X, X, _, MagnitudeExplanation):-
     transition(X, X),
-    MagnitudeExplanation = "The magnitude of the " + Name + " changed but remained on the same interval.",
-    nl.
+    string_concat(Name, " magnitude changed but remained on the same interval.", MagnitudeExplanation).
 
 is_magnitude_transition(Name, X, X, 0, MagnitudeExplanation):-
-    MagnitudeExplanation = "The magnitude value of this quantity remained the same.",
-    nl.
+    string_concat(Name, " magnitude remained the same.", MagnitudeExplanation).
 
 is_magnitude_transition(Name, X, Y, Derivative, MagnitudeExplanation):-
     transition(X, Y),
     Derivative == '+',
-    MagnitudeExplanation = "The magnitude of this quantity transitioned to a higher milestone/interval.",
-    nl;
+    string_concat(Name, " magnitude transitioned to a higher milestone/interval.", MagnitudeExplanation);
     transition(Y, X),
     Derivative == '-',
-    MagnitudeExplanation = "The magnitude of this quantity transitioned to a lower milestone/interval.",
-    nl.
+    string_concat(Name, " magnitude transitioned to a lower milestone/interval.", MagnitudeExplanation).
 
-is_derivative_transition(Name, _, _, _, ""):-
-    not(exogenous(Name)), !.
+is_derivative_transition(Name, _, _, _, DerivativeExplanation):-
+    not(exogenous(Name)), !,
+    string_concat(Name, " derivative transition effected by other quantities.", DerivativeExplanation).
 
-is_derivative_transition(_, _, X, X, "same derivative"):- !.
+is_derivative_transition(Name, _, X, X, DerivativeExplanation):- 
+    !,
+    string_concat(Name, " derivative remained the same.", DerivativeExplanation).
 
-is_derivative_transition(Name, NextMagnitude, _, 0, "Derivative cannot extend past extremum."):-
-    highest_magnitude(Name, NextMagnitude), !;
-    lowest_magnitude(Name, NextMagnitude).
+is_derivative_transition(Name, NextMagnitude, _, 0, DerivativeExplanation):-
+    highest_magnitude(Name, NextMagnitude), !,
+    string_concat(Name, " derivative cannot go past magnitude maximum.", DerivativeExplanation);
+    lowest_magnitude(Name, NextMagnitude),
+    string_concat(Name, " derivative cannot go below magnitude minimum.", DerivativeExplanation).
 
-is_derivative_transition(Name, _, X, Y, "inflow transition"):-
+is_derivative_transition(Name, _, X, Y, DerivativeExplanation):-
     exogenous(Name),
-    transition(X, Y), !;
+    transition(X, Y), !,
+    string_concat(Name, " derivative increased.", DerivativeExplanation);
     exogenous(Name),
-    transition(Y, X).
+    transition(Y, X),
+    string_concat(Name, " derivative decreased.", DerivativeExplanation).
 
 consistent_magnitude(Object, Subject):-
     Subject = [SubjectName, SubjectMagnitude, _],
@@ -261,14 +264,49 @@ transition_state(State, TransitionState, Trace):-
     valid_transition(State, TransitionState, Trace).
 
 next_states(State, NextStates):-
-    setof(NextState, next_state(State, NextState), NextStates).
+    findall(NextState, next_state(State, NextState), NextStates).
 
 % Pick a next transition state subject to the transition rules
 next_state(State, NextState):-
-    transition_state(State, TransitionState, Trace),
-    explain_transition(Trace),
-    % findall(Quantity, quantity(Quantity), Quantities),
-    resolution(TransitionState, TransitionState, NextState).
+    transition_state(State, TransitionState, InterTrace),
+    resolution(TransitionState, TransitionState, NextState),
+    write("BeginState: "), write(State), nl,
+    explain_transition(InterTrace).
+
+travel(State, VisitedStates, Edges):-
+    next_states(State, NextStates),
+    traverse_path(State, NextStates, [], Visited),
+    sort(Visited, VisitedStates),
+    collect_edges(VisitedStates, Edges),
+    save_to_file(Edges).
+
+save_to_file(Edges):-
+    open("edges.txt", write, Stream), 
+    write(Stream, "state, next_states"),  nl(Stream),  
+    write_list(Edges, Stream),
+    close(Stream).
+
+write_list([], _).
+write_list([[State, NextStates]|Edges], Stream):-
+    write(Stream, State), write(Stream, ", "), write(Stream, NextStates),  nl(Stream),
+    write_list(Edges, Stream).
+
+traverse_path(_, [], VisitedStates, VisitedStates).
+traverse_path(LastState, [State|States], Visited, Edges):-
+    member(State, Visited),
+    traverse_path(LastState, States, Visited, Edges).
+
+traverse_path(LastState, [State|States], Visited, VisitedFinal):-
+    not(member(State, Visited)),
+    next_states(State, NextStates),
+    traverse_path(State, NextStates, [LastState|Visited], VisitedResults),
+    traverse_path(State, States, VisitedResults, VisitedFinal).
+
+collect_edges([], []).
+collect_edges([State|States], [[State, GoesTo]|Edges]):-
+    next_states(State, GoesTo),
+    collect_edges(States, Edges).
+
 
 % Check for each quantity if its next values are legit
 valid_transition([], [], []):- !.
@@ -287,13 +325,22 @@ print([H|T]):-
     nl,
     print(T).
 
+print_edges([]).
+print_edges([[State, GoesTo]|T]):-
+    write(State),
+    write(": "), nl,
+    write(GoesTo),
+    nl,
+    nl,
+    print_edges(T).
+
 explain_transition([]).
 explain_transition([H|T]):-
     H = [MagnitudeExplanation, DerivativeExplanation],
     string(MagnitudeExplanation),
     string(DerivativeExplanation),
-    write(MagnitudeExplanation), write(" "),
-    write(DerivativeExplanation), nl,
+    write(MagnitudeExplanation), nl,
+    write(DerivativeExplanation), nl, nl,
     explain_transition(T).
 
 % Split a list into two sublist given the length of the first list
